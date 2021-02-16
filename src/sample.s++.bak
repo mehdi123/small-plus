@@ -1,0 +1,22 @@
+/* A program to perform Euclid's 
+    algorithm to compute gcd. */
+
+int gcd(int v){
+	if(v!=0){
+		if(v!=gcd(v+10))
+			return 1;
+	}else{
+		output(v);
+		while(v!=1){
+			if(v==1){
+				output(v+1);
+			}
+	}
+}
+	
+void main(void)
+{
+	int x;
+	x=input();
+	gcd(x);
+}

@@ -1,0 +1,196 @@
+package Parser;
+
+import java_cup.runtime.*;
+
+/* Parser code to change the way the parser reports errors (include
+   line and column number of the error). */
+
+init with {: Cons.debugOn=false;:} ;
+parser code {:
+    
+    /* Change the method report_error so it will display the line and
+       column of where the error occurred in the input as well as the
+       reason for the error which is passed into the method in the
+       String 'message'. */
+
+
+    public void report_error(String message, Object info) {
+   
+        /* Create a StringBuffer called 'm' with the string 'Error' in it. */
+        StringBuffer m = new StringBuffer("Error");
+   
+        /* Check if the information passed to the method is the same
+           type as the type java_cup.runtime.Symbol. */
+        if (info instanceof java_cup.runtime.Symbol) {
+            /* Declare a java_cup.runtime.Symbol object 's' with the
+               information in the object info that is being typecasted
+               as a java_cup.runtime.Symbol object. */
+            java_cup.runtime.Symbol s = ((java_cup.runtime.Symbol) info);
+   
+            /* Check if the line number in the input is greater or
+               equal to zero. */
+            if (s.left >= 0) {                
+                /* Add to the end of the StringBuffer error message
+                   the line number of the error in the input. */
+                m.append(" in line "+(s.left+1));   
+                /* Check if the column number in the input is greater
+                   or equal to zero. */
+                if (s.right >= 0)                    
+                    /* Add to the end of the StringBuffer error message
+                       the column number of the error in the input. */
+                    m.append(", column "+(s.right+1));
+            }
+        }
+   
+        /* Add to the end of the StringBuffer error message created in
+           this method the message that was passed into this method. */
+        m.append(" : "+message);
+   
+        /* Print the contents of the StringBuffer 'm', which contains
+           an error message, out on a line. */
+        System.err.println(m);
+    }
+   
+    /* Change the method report_fatal_error so when it reports a fatal
+       error it will display the line and column number of where the
+       fatal error occurred in the input as well as the reason for the
+       fatal error which is passed into the method in the object
+       'message' and then exit.*/
+    public void report_fatal_error(String message, Object info) {
+        report_error(message, info);
+        System.exit(1);
+    }
+:};
+
+
+/* Terminals (tokens returned by the scanner). */
+terminal           SEMI, COMMA, PLUS, MINUS, TIMES, DIVIDE, EQ, LTEQ , LT , GT , GTEQ, EQEQ , NOTEQ;
+terminal           LPAREN, RPAREN, LBRACK, RBRACK, LBRACE, RBRACE, INT, VOID, IF, WHILE, ELSE, RETURN;
+terminal Integer   NUMBER;
+terminal String ID;
+
+/* Non terminals */
+non terminal Program     program;
+non terminal Declaration_list declaration_list;
+non terminal Declaration declaration;
+non terminal Var_declaration var_declaration;
+non terminal Integer type_specifier;
+non terminal Local_declarations local_declarations;
+non terminal Statement_list statement_list;
+non terminal Statement statement;
+non terminal Expression_stmt expression_stmt;
+non terminal Selection_stmt selection_stmt;
+non terminal Iteration_stmt iteration_stmt;
+non terminal Return_stmt return_stmt;
+non terminal Expression expression;
+non terminal Var var;
+non terminal Simple_expression simple_expression;
+non terminal Additive_expression additive_expression;
+non terminal Term term;
+non terminal Factor factor;
+non terminal Fun_declaration fun_declaration;
+non terminal Params params, param_list;
+non terminal Param param;
+non terminal Compound_stmt compound_stmt;
+non terminal Call call;
+non terminal Args args;
+non terminal Arg_list arg_list;
+/* Precedences */
+precedence left PLUS, MINUS;
+precedence left TIMES, DIVIDE;
+precedence left LPAREN;
+precedence left ELSE, IF;
+
+start with program;
+
+/* The grammar */
+program			::= declaration_list:dl {: RESULT=new Program(dl); Cons.debug("Program"); 
+						Cons.debug(RESULT.generateCode());
+						Cons.debug("Program end"); :};
+
+declaration_list	::= declaration_list:dl declaration:d {: dl.addDeclaration(d); RESULT=dl;  Cons.debug("decl list"); :}
+			  | declaration:d {: RESULT=new Declaration_list(d); Cons.debug("single decl"); :};
+
+declaration		::= var_declaration :vd {: RESULT=new Declaration(vd); Cons.debug("declaration");:} 
+			  | fun_declaration :fn {: RESULT=new Declaration(fn); Cons.debug("function declaration");:} ;
+
+var_declaration		::= type_specifier ID:name SEMI {: RESULT=new Var_declaration(name, 1); :}
+			  | type_specifier ID:name  LBRACK NUMBER:num RBRACK SEMI {: RESULT=new Var_declaration(name, num.intValue()); :};
+
+type_specifier		::= INT {: RESULT=new Integer(sym.INT);:}| VOID {:RESULT=new Integer(sym.VOID);:};
+
+fun_declaration		::= type_specifier:t ID:id LPAREN params:p RPAREN compound_stmt:c
+			{: RESULT=new Fun_declaration(t.intValue(), id, p, c);:};
+
+params			::= param_list:pl {: RESULT=pl; :}
+			  | VOID {: RESULT = new Params(); :};
+
+param_list		::= param_list:pl COMMA param:p {:pl.addParam(p); RESULT=new Params(pl); :}
+			  | param:p {: RESULT=new Params(p); :};
+
+param			::= type_specifier ID:name {:RESULT=new Param(name, false); :}
+			  | type_specifier ID:name LBRACK RBRACK {: RESULT=new Param(name,  true); :};
+
+compound_stmt		::= LBRACE local_declarations:l statement_list:s RBRACE 
+				{: RESULT=new Compound_stmt(l, s);
+				Cons.debug("number in statement "); 
+				Cons.debug(Integer.toString(s.getNum()));
+				:};
+
+local_declarations	::= local_declarations:l var_declaration:vd {: l.addVar_declaration(vd); RESULT=new Local_declarations(l); :}
+			  | {:RESULT=new Local_declarations(); :}; 
+
+statement_list		::= statement_list:sl statement:s {: sl.addStatement(s); RESULT=new Statement_list(sl); :}
+			  | {: RESULT=new Statement_list(); :};
+
+statement		::= expression_stmt:e {: RESULT=new Statement(e); :}
+			  | compound_stmt:c   {:RESULT=new Statemet(c); :}
+			  | selection_stmt:s {: RESULT=new Statement(s); :}
+			  | iteration_stmt:i {: RESULT=new Statement(i); :}
+			  | return_stmt:r {: RESULT=new Statement(r); :} ; 
+
+expression_stmt		::= expression:e SEMI {: RESULT=new Expression_stmt(e); :}
+			  | SEMI {: RESULT=null; :};
+
+selection_stmt		::= IF LPAREN expression:e RPAREN statement:s {: RESULT=new Selection_stmt(e, s); :}
+			  | IF LPAREN expression:e RPAREN statement:s1 ELSE statement:s2{: RESULT=new Selection_stmt(e, s1, s2); :}  %prec ELSE ;
+
+iteration_stmt		::= WHILE LPAREN expression:e RPAREN statement:s {: RESULT=new Iteration_stmt(e, s); :};
+
+return_stmt		::= RETURN SEMI {: RESULT=new Return_stmt(); :}
+			  | RETURN expression:e SEMI {: RESULT=new Return_stmt(e); :};
+
+expression		::= var:v EQ expression:e {: RESULT=new Expression(v, e); Cons.debug("assign");:}
+			  | simple_expression:se  {: RESULT=new Expression(se); Cons.debug("simple exp");:};
+
+var			::= ID:name {: RESULT=new Var(name); :}
+			  | ID:name LBRACK expression:e RBRACK {: RESULT=new Var(name, e); :};
+
+simple_expression	::= additive_expression:a1 LTEQ  additive_expression:a2 {: RESULT=new Simple_expression(a1, sym.LTEQ, a2); :}
+			  | additive_expression:a1 LT    additive_expression:a2 {: RESULT=new Simple_expression(a1, sym.LT, a2); :}
+			  | additive_expression:a1 GT    additive_expression:a2 {: RESULT=new Simple_expression(a1, sym.GT, a2); :}
+			  | additive_expression:a1 GTEQ  additive_expression:a2 {: RESULT=new Simple_expression(a1, sym.GTEQ, a2); :}
+			  | additive_expression:a1 EQEQ  additive_expression:a2 {: RESULT=new Simple_expression(a1, sym.EQEQ, a2); :}
+			  | additive_expression:a1 NOTEQ additive_expression:a2 {: RESULT=new Simple_expression(a1, sym.NOTEQ, a2); :}
+			  | additive_expression:a1 {: RESULT=new Simple_expression(a1); :};
+
+additive_expression	::= additive_expression:a PLUS term:t {:RESULT = new Additive_expression(a, sym.PLUS, t); :}
+			  | additive_expression:a MINUS term:t {:RESULT = new Additive_expression(a, sym.PLUS, t); :}
+			  | term:t {:RESULT = new Additive_expression(t); :};
+
+term			::= term:t TIMES factor:f {: RESULT = new Term(t, sym.TIMES, f); :}
+			  | term:t DIVIDE factor:f {: RESULT = new Term(t, sym.DIVIDE, f); :}
+			  | factor:f {: RESULT = new Term(f); :};
+
+factor			::= LPAREN expression:e RPAREN {: RESULT = new Factor(e); :}
+			  | var:v {: RESULT = new Factor(v); :}
+			  | call:c  {: RESULT = new Factor(c); :}
+			  | NUMBER:n {: RESULT = new Factor(n.intValue()); :}; 
+
+call			::= ID:name LPAREN args:ar RPAREN {: RESULT=new Call(name, ar); Cons.debug(name+" call"); :};
+
+args			::= arg_list:ar {: RESULT=new Args(ar); :}
+			  | {: RESULT=new Args(null); :};
+
+arg_list		::= arg_list:ar COMMA expression:e {: ar.addArg(e); RESULT= new Arg_list(ar);:}
+			  | expression:e {:RESULT=new Arg_list(e);:};
